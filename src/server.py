@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 
 from src.config import API_SECRET_KEY, INPUTS_DIR
-from src.database import init_db, create_job, get_job, get_queue_position
+from src.database import init_db, create_job, get_job, get_queue_position, list_jobs
 from src.storage import download_image, get_presigned_url
 from src.worker import worker
 
@@ -72,6 +72,15 @@ class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     current_job: Optional[str] = None
+
+
+class JobItem(BaseModel):
+    job_id: str
+    status: str
+    prompt: str
+    video_url: Optional[str] = None
+    error: Optional[str] = None
+    created_at: str
 
 
 # --- Endpoints ---
@@ -145,3 +154,26 @@ async def status(job_id: str):
         video_url=video_url,
         error=job["error"],
     )
+
+
+@app.get("/jobs", response_model=list[JobItem], dependencies=[Depends(verify_api_key)])
+async def list_all_jobs(status: Optional[str] = None, limit: int = 100):
+    """List all jobs with optional status filter."""
+    jobs = list_jobs(status=status, limit=limit)
+
+    result = []
+    for job in jobs:
+        video_url = None
+        if job["status"] == "completed" and job["s3_key"]:
+            video_url = get_presigned_url(job["s3_key"])
+
+        result.append(JobItem(
+            job_id=job["id"],
+            status=job["status"],
+            prompt=job["prompt"],
+            video_url=video_url,
+            error=job["error"],
+            created_at=job["created_at"],
+        ))
+
+    return result

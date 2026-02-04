@@ -88,6 +88,24 @@ def get_queue_position(job_id: str) -> int:
         return -1
 
 
+def list_jobs(status: Optional[str] = None, limit: int = 100) -> list[dict]:
+    """List jobs with optional status filter."""
+    with get_connection() as conn:
+        if status:
+            rows = conn.execute(
+                """SELECT * FROM jobs WHERE status = ?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (status, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM jobs
+                   ORDER BY created_at DESC LIMIT ?""",
+                (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+
 def update_job_status(
     job_id: str,
     status: str,
