@@ -1,16 +1,20 @@
 # WAN 2.2 Video Generation API
 
-Self-hosted WAN 2.2 TI2V-5B video generation API for AWS EC2.
+Self-hosted WAN 2.2 14B FP8 video generation API powered by ComfyUI on AWS EC2.
 
 ## Architecture
 
-- **EC2 (Compute)**: g5.xlarge in **Tokyo (ap-northeast-1)** — ~$1.46/hr
+- **Model**: WAN 2.2 14B FP8 (dual expert: high-noise + low-noise)
+- **Backend**: ComfyUI (localhost:8188) — handles model loading, inference, and GPU management
+- **API**: FastAPI (port 8000) — public REST API that submits workflows to ComfyUI
+- **EC2 (Compute)**: g5.xlarge in **Tokyo (ap-northeast-1)** — NVIDIA A10G 24GB VRAM, ~$1.46/hr
 - **S3 (Storage)**: Bucket in **Singapore (ap-southeast-1)** — close to end users for fast video downloads
 
 ## Prerequisites
 
 - AWS EC2 g5.xlarge instance (24GB VRAM A10G GPU)
 - Ubuntu 22.04 Deep Learning AMI
+- Storage: 150GB EBS (models are ~60GB total)
 - S3 bucket in ap-southeast-1 for video storage
 
 ## Quick Start
@@ -19,7 +23,7 @@ Self-hosted WAN 2.2 TI2V-5B video generation API for AWS EC2.
 
 Launch a g5.xlarge instance in **ap-northeast-1 (Tokyo)** with:
 - AMI: Deep Learning AMI GPU PyTorch 2.0+ (Ubuntu 22.04)
-- Storage: 100GB EBS
+- Storage: 150GB EBS
 - Security Group: Allow ports 22 (SSH) and 8000 (API)
 
 ### 2. Clone and Setup
@@ -32,7 +36,7 @@ ssh -i your-key.pem ubuntu@<ec2-ip>
 git clone <your-repo-url> ~/wan22
 cd ~/wan22
 
-# Run setup (downloads model, ~30 min)
+# Run setup (downloads ~60GB of models, takes ~20-30 min)
 ./scripts/setup.sh
 ```
 
@@ -55,115 +59,45 @@ Generate a secure API key:
 openssl rand -hex 32
 ```
 
-### 4. Start the Server
+### 4. Start the Services
 
 ```bash
-# Using systemd (recommended)
+# Start ComfyUI backend first, then the API
+sudo systemctl start comfyui
 sudo systemctl start wan-api
-sudo journalctl -u wan-api -f
 
-# Or manually
-./scripts/start.sh
+# Check logs
+sudo journalctl -u comfyui -f
+sudo journalctl -u wan-api -f
 ```
 
 ## API Usage
 
-### Health Check
+See [docs/API.md](docs/API.md) for full API reference.
+
+### Quick Examples
 
 ```bash
+# Health check
 curl http://<ec2-ip>:8000/health
-```
 
-### Generate Video (Text-to-Video)
-
-```bash
+# Text-to-Video
 curl -X POST http://<ec2-ip>:8000/generate \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{"prompt": "A cat dancing on the moon"}'
-```
 
-Response:
-```json
-{"job_id": "abc-123", "status": "queued", "position": 0}
-```
-
-### Generate Video (Image-to-Video)
-
-```bash
-# With image URL
-curl -X POST http://<ec2-ip>:8000/generate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-secret-key" \
-  -d '{
-    "prompt": "Make this character dance",
-    "image_url": "https://example.com/image.jpg"
-  }'
-
-# With base64 image
-curl -X POST http://<ec2-ip>:8000/generate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-secret-key" \
-  -d '{
-    "prompt": "Make this character dance",
-    "image_base64": "'$(base64 -i image.jpg)'"
-  }'
-```
-
-### Check Status
-
-```bash
-curl http://<ec2-ip>:8000/status/abc-123 \
+# Check status
+curl http://<ec2-ip>:8000/status/<job_id> \
   -H "X-API-Key: your-secret-key"
 ```
 
-Response (when complete):
-```json
-{
-  "job_id": "abc-123",
-  "status": "completed",
-  "video_url": "https://s3.../presigned-url...",
-  "error": null
-}
-```
+## Video Output
 
-## Node.js Client Example
-
-```typescript
-const API_URL = 'http://<ec2-ip>:8000';
-const API_KEY = 'your-secret-key';
-
-async function generateVideo(prompt: string, imageUrl?: string) {
-  // Submit job
-  const response = await fetch(`${API_URL}/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': API_KEY,
-    },
-    body: JSON.stringify({ prompt, image_url: imageUrl }),
-  });
-
-  const { job_id } = await response.json();
-
-  // Poll for completion
-  while (true) {
-    const statusRes = await fetch(`${API_URL}/status/${job_id}`, {
-      headers: { 'X-API-Key': API_KEY },
-    });
-    const status = await statusRes.json();
-
-    if (status.status === 'completed') {
-      return status.video_url;
-    }
-    if (status.status === 'failed') {
-      throw new Error(status.error);
-    }
-
-    await new Promise(r => setTimeout(r, 10000)); // Wait 10s
-  }
-}
-```
+- **Resolution**: 832x480 (480p)
+- **Frames**: 81 (~5 seconds at 16fps)
+- **Format**: WEBP (animated)
+- **Estimated generation time**: ~6-10 minutes per video
 
 ## Cost Management
 
@@ -176,18 +110,24 @@ async function generateVideo(prompt: string, imageUrl?: string) {
 
 ### Check logs
 ```bash
+# ComfyUI backend
+sudo journalctl -u comfyui -f
+
+# API server
 sudo journalctl -u wan-api -f
 ```
 
-### Manual test inference
+### ComfyUI not responding
 ```bash
-cd /data/Wan2.2
-source /data/venv/bin/activate
-python generate.py --task ti2v-5B --size 1280*720 \
-  --ckpt_dir /data/Wan2.2-TI2V-5B \
-  --offload_model True --convert_model_dtype --t5_cpu \
-  --prompt "A cat dancing"
+# Restart ComfyUI
+sudo systemctl restart comfyui
+
+# Wait for it to load, then restart API
+sleep 10
+sudo systemctl restart wan-api
 ```
 
 ### Out of memory
-The A10G has 24GB VRAM. If OOM occurs, the flags `--offload_model True --t5_cpu` should help. Reduce `--size` to `832*480` if still failing.
+The A10G has 24GB VRAM. WAN 2.2 14B FP8 at 480p typically uses ~18-22GB VRAM. If OOM occurs:
+- Reduce `VIDEO_FRAME_NUM` in `src/config.py` (e.g., 41 frames instead of 81)
+- Ensure no other GPU processes are running: `nvidia-smi`

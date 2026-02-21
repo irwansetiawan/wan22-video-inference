@@ -1,17 +1,20 @@
 #!/bin/bash
 set -e
 
-DATA_DIR="${DATA_DIR:-/data}"
+echo "Starting WAN 2.2 services..."
 
-# Activate virtual environment
-source "$DATA_DIR/venv/bin/activate"
+# Start ComfyUI backend first
+sudo systemctl start comfyui
+echo "ComfyUI started (port 8188)"
 
-# Load environment variables
-if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
-fi
+# Wait briefly for ComfyUI to initialize
+sleep 5
 
-export DATA_DIR
+# Start API server
+sudo systemctl start wan-api
+echo "API server started (port 8000)"
 
-echo "Starting WAN 2.2 API server..."
-exec uvicorn src.server:app --host 0.0.0.0 --port 8000
+echo ""
+echo "Services running. Check logs with:"
+echo "  sudo journalctl -u comfyui -f"
+echo "  sudo journalctl -u wan-api -f"

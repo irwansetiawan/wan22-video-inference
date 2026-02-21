@@ -1,6 +1,6 @@
 # WAN 2.2 Video Generation API
 
-REST API for generating videos using the WAN 2.2 TI2V-5B model. Supports both text-to-video and image-to-video generation.
+REST API for generating videos using the WAN 2.2 14B model (FP8 quantized, powered by ComfyUI). Supports both text-to-video and image-to-video generation.
 
 ## Base URL
 
@@ -238,7 +238,7 @@ queued → processing → completed
 ```
 
 1. **queued** — Job is waiting in the queue
-2. **processing** — Video is being generated (typically 5–30 minutes)
+2. **processing** — Video is being generated (typically 6–10 minutes at 480p)
 3. **completed** — Video is ready, `video_url` is available
 4. **failed** — Generation failed, see `error` for details
 
@@ -246,8 +246,11 @@ Jobs are processed sequentially, one at a time.
 
 ## Video Output
 
-- **Format:** MP4
-- **Resolution:** 1280x720
+- **Model:** WAN 2.2 14B (FP8 quantized, dual expert architecture)
+- **Format:** WEBP (animated)
+- **Resolution:** 832x480 (480p)
+- **Frame rate:** 16 fps
+- **Duration:** ~5 seconds (81 frames)
 - **Storage:** Videos are uploaded to S3 and served via presigned URLs
 - **URL Expiry:** Presigned URLs expire after 1 hour. Call `/status/{job_id}` again to get a fresh URL.
 

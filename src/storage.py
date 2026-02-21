@@ -23,11 +23,17 @@ def get_s3_client():
 def upload_video(local_path: Path, s3_key: str) -> str:
     """Upload a video file to S3 and return the S3 key."""
     client = get_s3_client()
+    content_types = {
+        ".mp4": "video/mp4",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }
+    content_type = content_types.get(local_path.suffix, "application/octet-stream")
     client.upload_file(
         str(local_path),
         S3_BUCKET,
         s3_key,
-        ExtraArgs={"ContentType": "video/mp4"}
+        ExtraArgs={"ContentType": content_type}
     )
     return s3_key
 

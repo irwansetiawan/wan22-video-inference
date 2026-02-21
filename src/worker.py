@@ -71,7 +71,8 @@ class VideoWorker:
             )
 
             # Upload to S3
-            s3_key = f"videos/{job_id}.mp4"
+            ext = video_path.suffix  # .webp from ComfyUI
+            s3_key = f"videos/{job_id}{ext}"
             upload_video(video_path, s3_key)
 
             # Mark complete

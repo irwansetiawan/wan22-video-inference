@@ -1,8 +1,11 @@
 #!/bin/bash
 
-echo "Stopping WAN 2.2 API server..."
+echo "Stopping WAN 2.2 services..."
 
-# Find and kill uvicorn process
-pkill -f "uvicorn src.server:app" || true
+sudo systemctl stop wan-api 2>/dev/null || true
+echo "API server stopped"
 
-echo "Server stopped"
+sudo systemctl stop comfyui 2>/dev/null || true
+echo "ComfyUI stopped"
+
+echo "All services stopped"
