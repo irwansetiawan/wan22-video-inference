@@ -2,17 +2,22 @@
 
 Self-hosted WAN 2.2 TI2V-5B video generation API for AWS EC2.
 
+## Architecture
+
+- **EC2 (Compute)**: g5.xlarge in **Tokyo (ap-northeast-1)** — ~$1.46/hr
+- **S3 (Storage)**: Bucket in **Singapore (ap-southeast-1)** — close to end users for fast video downloads
+
 ## Prerequisites
 
-- AWS EC2 g5.xlarge instance (or any instance with 24GB+ VRAM)
+- AWS EC2 g5.xlarge instance (24GB VRAM A10G GPU)
 - Ubuntu 22.04 Deep Learning AMI
-- S3 bucket for video storage
+- S3 bucket in ap-southeast-1 for video storage
 
 ## Quick Start
 
 ### 1. Launch EC2 Instance
 
-Launch a g5.xlarge instance with:
+Launch a g5.xlarge instance in **ap-northeast-1 (Tokyo)** with:
 - AMI: Deep Learning AMI GPU PyTorch 2.0+ (Ubuntu 22.04)
 - Storage: 100GB EBS
 - Security Group: Allow ports 22 (SSH) and 8000 (API)
@@ -41,7 +46,7 @@ API_SECRET_KEY=your-secret-key-here
 AWS_ACCESS_KEY_ID=your-aws-key
 AWS_SECRET_ACCESS_KEY=your-aws-secret
 S3_BUCKET=your-bucket-name
-S3_REGION=ap-southeast-1
+S3_REGION=ap-southeast-1  # S3 in Singapore, close to end users
 EOF
 ```
 
@@ -162,9 +167,10 @@ async function generateVideo(prompt: string, imageUrl?: string) {
 
 ## Cost Management
 
-- g5.xlarge costs ~$1.00/hour
-- Stop instance when not in use: `aws ec2 stop-instances --instance-ids <id>`
-- Start when needed: `aws ec2 start-instances --instance-ids <id>`
+- g5.xlarge in Tokyo costs ~$1.46/hour
+- Stop instance when not in use: `aws ec2 stop-instances --instance-ids <id> --region ap-northeast-1`
+- Start when needed: `aws ec2 start-instances --instance-ids <id> --region ap-northeast-1`
+- Running 4 hours/day ≈ $175/month
 
 ## Troubleshooting
 
