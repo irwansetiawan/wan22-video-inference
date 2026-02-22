@@ -1,5 +1,6 @@
 import json
 import shutil
+import subprocess
 import time
 import logging
 import urllib.request
@@ -21,6 +22,9 @@ from src.config import (
     TI2V_MODEL,
     TEXT_ENCODER_MODEL,
     VAE_MODEL,
+    MMAUDIO_MODEL,
+    MMAUDIO_STEPS,
+    MMAUDIO_CFG,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,6 +232,49 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
     }
 
 
+def _build_audio_nodes(audio_prompt: str, seed: int) -> dict:
+    """Build MMAudio nodes to append to a video workflow.
+
+    Expects node "8" (VAEDecode) to exist in the parent workflow,
+    providing decoded video frames as input to MMAudioSampler.
+    """
+    return {
+        "70": {
+            "class_type": "MMAudioModelLoader",
+            "inputs": {
+                "mmaudio_model": MMAUDIO_MODEL,
+            },
+        },
+        "71": {
+            "class_type": "MMAudioFeatureUtilsLoader",
+            "inputs": {},
+        },
+        "72": {
+            "class_type": "MMAudioSampler",
+            "inputs": {
+                "mmaudio_model": ["70", 0],
+                "feature_utils": ["71", 0],
+                "images": ["8", 0],
+                "prompt": audio_prompt,
+                "negative_prompt": "",
+                "seed": seed,
+                "steps": MMAUDIO_STEPS,
+                "cfg": MMAUDIO_CFG,
+                "duration": round(VIDEO_FRAME_NUM / VIDEO_FPS, 2),
+                "mask_away_clip": False,
+                "force_offload": True,
+            },
+        },
+        "73": {
+            "class_type": "SaveAudio",
+            "inputs": {
+                "filename_prefix": "wan22_audio",
+                "audio": ["72", 0],
+            },
+        },
+    }
+
+
 def _submit_prompt(workflow: dict) -> str:
     """Submit a workflow to ComfyUI and return the prompt_id."""
     payload = json.dumps({"prompt": workflow}).encode("utf-8")
@@ -277,30 +324,81 @@ def _poll_completion(prompt_id: str, timeout: int = 2700) -> dict:
     raise InferenceError(f"Video generation timed out after {timeout // 60} minutes")
 
 
-def _download_output(history_entry: dict, output_dir: Path) -> Path:
-    """Download the generated video from ComfyUI output."""
+def _download_comfyui_file(item: dict, output_dir: Path) -> Path:
+    """Download a single file from ComfyUI output."""
+    filename = item["filename"]
+    params = urllib.parse.urlencode({
+        "filename": filename,
+        "subfolder": item.get("subfolder", ""),
+        "type": item.get("type", "output"),
+    })
+    url = f"{COMFYUI_URL}/view?{params}"
+    out_path = output_dir / filename
+    urllib.request.urlretrieve(url, str(out_path))
+    return out_path
+
+
+def _download_output(
+    history_entry: dict, output_dir: Path, has_audio: bool = False
+) -> tuple[Path, "Path | None"]:
+    """Download generated video (and optionally audio) from ComfyUI output."""
     outputs = history_entry.get("outputs", {})
+    video_path = None
+    audio_path = None
+
     for node_id, node_output in outputs.items():
+        # Look for video files
         for key in ["images", "gifs", "videos"]:
             if key not in node_output:
                 continue
             for item in node_output[key]:
-                filename = item["filename"]
-                if filename.endswith((".mp4", ".webp", ".gif")):
-                    params = urllib.parse.urlencode({
-                        "filename": filename,
-                        "subfolder": item.get("subfolder", ""),
-                        "type": item.get("type", "output"),
-                    })
-                    url = f"{COMFYUI_URL}/view?{params}"
-                    out_path = output_dir / filename
+                if item["filename"].endswith((".mp4", ".webp", ".gif")):
                     try:
-                        urllib.request.urlretrieve(url, str(out_path))
+                        video_path = _download_comfyui_file(item, output_dir)
                     except Exception as e:
-                        raise InferenceError(f"Failed to download output: {e}")
-                    return out_path
+                        raise InferenceError(f"Failed to download video: {e}")
 
-    raise InferenceError("No video file found in ComfyUI output")
+        # Look for audio files
+        if has_audio and "audio" in node_output:
+            for item in node_output["audio"]:
+                if item["filename"].endswith((".flac", ".wav", ".mp3", ".ogg", ".opus")):
+                    try:
+                        audio_path = _download_comfyui_file(item, output_dir)
+                    except Exception as e:
+                        raise InferenceError(f"Failed to download audio: {e}")
+
+    if video_path is None:
+        raise InferenceError("No video file found in ComfyUI output")
+
+    if has_audio and audio_path is None:
+        logger.warning("Audio was requested but no audio file found in ComfyUI output")
+
+    return video_path, audio_path
+
+
+def _combine_audio_video(video_path: Path, audio_path: Path, output_dir: Path) -> Path:
+    """Mux audio into video using ffmpeg."""
+    combined_path = output_dir / f"wan22_combined_{video_path.stem}.mp4"
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(video_path),
+        "-i", str(audio_path),
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-shortest",
+        str(combined_path),
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise InferenceError(f"ffmpeg muxing failed: {result.stderr[:500]}")
+    except subprocess.TimeoutExpired:
+        raise InferenceError("ffmpeg muxing timed out after 60 seconds")
+    except FileNotFoundError:
+        raise InferenceError("ffmpeg not found on system")
+
+    return combined_path
 
 
 def _copy_image_to_comfyui(image_path: Path) -> None:
@@ -315,11 +413,13 @@ def generate_video(
     job_id: str,
     prompt: str,
     image_path: Optional[Path] = None,
+    audio_prompt: Optional[str] = None,
 ) -> Path:
     """
     Generate a video using ComfyUI with WAN 2.2 5B model.
+    Optionally generates synchronized audio via MMAudio.
 
-    Returns the path to the generated video file.
+    Returns the path to the generated video file (with audio if requested).
     Raises InferenceError if generation fails.
     """
     output_dir = OUTPUTS_DIR / job_id
@@ -333,15 +433,25 @@ def generate_video(
     else:
         workflow = _build_t2v_workflow(prompt, seed)
 
-    logger.info(f"Submitting job {job_id} to ComfyUI")
+    has_audio = bool(audio_prompt)
+    if has_audio:
+        workflow.update(_build_audio_nodes(audio_prompt, seed))
+
+    logger.info(f"Submitting job {job_id} to ComfyUI (audio={'yes' if has_audio else 'no'})")
     prompt_id = _submit_prompt(workflow)
     logger.info(f"Job {job_id} submitted as ComfyUI prompt {prompt_id}")
 
     history = _poll_completion(prompt_id)
     logger.info(f"Job {job_id} ComfyUI execution complete, downloading output")
 
-    video_path = _download_output(history, output_dir)
+    video_path, audio_path = _download_output(history, output_dir, has_audio=has_audio)
     logger.info(f"Job {job_id} video saved to {video_path}")
+
+    if audio_path:
+        logger.info(f"Job {job_id} combining audio with video")
+        combined_path = _combine_audio_video(video_path, audio_path, output_dir)
+        logger.info(f"Job {job_id} combined video saved to {combined_path}")
+        return combined_path
 
     return video_path
 

@@ -68,6 +68,7 @@ class VideoWorker:
                 job_id=job_id,
                 prompt=job["prompt"],
                 image_path=input_path,
+                audio_prompt=job.get("audio_prompt"),
             )
 
             # Upload to S3

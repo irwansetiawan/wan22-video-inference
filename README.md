@@ -5,6 +5,7 @@ Self-hosted WAN 2.2 5B video generation API powered by ComfyUI on AWS EC2.
 ## Architecture
 
 - **Model**: WAN 2.2 5B FP16 (unified TI2V, single dense model ~10GB)
+- **Audio Model**: MMAudio Large 44k v2 (optional, ~3.9GB)
 - **Backend**: ComfyUI (localhost:8188) — handles model loading, inference, and GPU management
 - **API**: FastAPI (port 8000) — public REST API that submits workflows to ComfyUI
 - **EC2 (Compute)**: g5.xlarge in **Tokyo (ap-northeast-1)** — NVIDIA A10G 24GB VRAM, ~$1.46/hr
@@ -14,7 +15,7 @@ Self-hosted WAN 2.2 5B video generation API powered by ComfyUI on AWS EC2.
 
 - AWS EC2 g5.xlarge instance (24GB VRAM A10G GPU)
 - Ubuntu 22.04 Deep Learning AMI
-- Storage: 100GB EBS (models are ~16GB total)
+- Storage: 100GB EBS (models are ~21GB total)
 - S3 bucket in ap-southeast-1 for video storage
 
 ## Quick Start
@@ -36,7 +37,7 @@ ssh -i your-key.pem ubuntu@<ec2-ip>
 git clone <your-repo-url> ~/wan22
 cd ~/wan22
 
-# Run setup (downloads ~16GB of models, takes ~5-10 min)
+# Run setup (downloads ~21GB of models, takes ~10-15 min)
 ./scripts/setup.sh
 ```
 
@@ -87,6 +88,12 @@ curl -X POST http://<ec2-ip>:8000/generate \
   -H "X-API-Key: your-secret-key" \
   -d '{"prompt": "A cat dancing on the moon"}'
 
+# Text-to-Video with Audio
+curl -X POST http://<ec2-ip>:8000/generate \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{"prompt": "A cat dancing on the moon", "audio_prompt": "Upbeat electronic music with a playful melody"}'
+
 # Check status
 curl http://<ec2-ip>:8000/status/<job_id> \
   -H "X-API-Key: your-secret-key"
@@ -97,8 +104,9 @@ curl http://<ec2-ip>:8000/status/<job_id> \
 - **Resolution**: 1280x704 (720p)
 - **Frame rate**: 24fps (native)
 - **Duration**: ~5 seconds (121 frames)
-- **Format**: MP4 (H.264)
-- **Estimated generation time**: ~9 minutes per video
+- **Format**: MP4 (H.264 video, AAC audio when `audio_prompt` is provided)
+- **Audio**: AI-generated via MMAudio (optional, synced to video content)
+- **Estimated generation time**: ~9 min (video only), ~10 min (with audio)
 
 ## Cost Management
 

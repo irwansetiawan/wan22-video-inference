@@ -66,6 +66,7 @@ POST /generate
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | Text description of the video to generate |
+| `audio_prompt` | string | No | Text description of audio/sound effects to generate. When provided, the output video includes AI-generated audio. |
 | `image_url` | string | No | URL of a reference image for image-to-video generation |
 | `image_base64` | string | No | Base64-encoded reference image for image-to-video generation |
 
@@ -101,6 +102,18 @@ curl -X POST http://<your-server-ip>:8000/generate \
   -d '{
     "prompt": "Make this character wave hello",
     "image_base64": "'$(base64 -i image.jpg)'"
+  }'
+```
+
+**Example — Text-to-Video with Audio**
+
+```bash
+curl -X POST http://<your-server-ip>:8000/generate \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <your-api-key>" \
+  -d '{
+    "prompt": "Ocean waves crashing on a rocky shoreline at sunset",
+    "audio_prompt": "Sound of ocean waves crashing, seagulls calling"
   }'
 ```
 
@@ -238,7 +251,7 @@ queued → processing → completed
 ```
 
 1. **queued** — Job is waiting in the queue
-2. **processing** — Video is being generated (typically ~9 minutes at 720p)
+2. **processing** — Video is being generated (typically ~9 min, ~10 min with audio)
 3. **completed** — Video is ready, `video_url` is available
 4. **failed** — Generation failed, see `error` for details
 
@@ -246,11 +259,13 @@ Jobs are processed sequentially, one at a time.
 
 ## Video Output
 
-- **Model:** WAN 2.2 5B (FP16, unified TI2V architecture)
-- **Format:** MP4 (H.264)
+- **Video Model:** WAN 2.2 5B (FP16, unified TI2V architecture)
+- **Audio Model:** MMAudio Large 44k v2 (optional, when `audio_prompt` is provided)
+- **Format:** MP4 (H.264 video, AAC audio when audio is generated)
 - **Resolution:** 1280x704 (720p)
 - **Frame rate:** 24fps (native)
 - **Duration:** ~5 seconds (121 frames)
+- **Audio:** 44.1kHz AAC (only when `audio_prompt` is provided)
 - **Storage:** Videos are uploaded to S3 and served via presigned URLs
 - **URL Expiry:** Presigned URLs expire after 1 hour. Call `/status/{job_id}` again to get a fresh URL.
 

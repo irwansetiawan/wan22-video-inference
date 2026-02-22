@@ -28,6 +28,13 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
         conn.commit()
 
+        # Migrate: add audio_prompt column if it doesn't exist
+        try:
+            conn.execute("ALTER TABLE jobs ADD COLUMN audio_prompt TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
 
 @contextmanager
 def get_connection():
@@ -40,16 +47,16 @@ def get_connection():
         conn.close()
 
 
-def create_job(prompt: str, image_path: Optional[str] = None) -> dict:
+def create_job(prompt: str, image_path: Optional[str] = None, audio_prompt: Optional[str] = None) -> dict:
     """Create a new job and return it."""
     job_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
     with get_connection() as conn:
         conn.execute(
-            """INSERT INTO jobs (id, prompt, image_path, created_at)
-               VALUES (?, ?, ?, ?)""",
-            (job_id, prompt, image_path, now)
+            """INSERT INTO jobs (id, prompt, image_path, audio_prompt, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (job_id, prompt, image_path, audio_prompt, now)
         )
         conn.commit()
 

@@ -16,7 +16,7 @@ mkdir -p "$DATA_DIR/inputs" "$DATA_DIR/outputs"
 # Install system dependencies
 echo "Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-venv git
+sudo apt-get install -y python3-pip python3-venv git ffmpeg
 
 # =============================================
 # ComfyUI Installation
@@ -85,6 +85,39 @@ download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
 echo "Downloading TI2V 5B model..."
 download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
     "split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors" "diffusion_models"
+
+# =============================================
+# ComfyUI-MMAudio Extension (audio generation)
+# =============================================
+echo "Installing ComfyUI-MMAudio extension..."
+CUSTOM_NODES_DIR="$COMFYUI_DIR/custom_nodes"
+MMAUDIO_DIR="$CUSTOM_NODES_DIR/ComfyUI-MMAudio"
+
+if [ ! -d "$MMAUDIO_DIR" ]; then
+    git clone https://github.com/kijai/ComfyUI-MMAudio.git "$MMAUDIO_DIR"
+fi
+
+source "$COMFYUI_DIR/venv/bin/activate"
+if [ -f "$MMAUDIO_DIR/requirements.txt" ]; then
+    pip install -r "$MMAUDIO_DIR/requirements.txt"
+fi
+
+# =============================================
+# Download MMAudio Models (~4.8GB total)
+# =============================================
+echo "Downloading MMAudio models..."
+
+# MMAudio large 44k v2 flow model (~3.9GB)
+echo "Downloading MMAudio flow model..."
+download_model "Kijai/MMAudio_safetensors" \
+    "mmaudio_large_44k_v2.pth" "mmaudio"
+
+# Synchformer visual encoder (~907MB)
+echo "Downloading Synchformer model..."
+download_model "Kijai/MMAudio_safetensors" \
+    "synchformer_state_dict.pth" "mmaudio"
+
+# Note: BigVGAN vocoder and CLIP models are auto-downloaded on first run
 
 # =============================================
 # API Server Dependencies

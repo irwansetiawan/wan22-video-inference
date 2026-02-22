@@ -51,6 +51,7 @@ def verify_api_key(x_api_key: str = Header(...)):
 
 class GenerateRequest(BaseModel):
     prompt: str
+    audio_prompt: Optional[str] = None
     image_base64: Optional[str] = None
     image_url: Optional[str] = None
 
@@ -123,6 +124,7 @@ async def generate(request: GenerateRequest):
     job = create_job(
         prompt=request.prompt,
         image_path=str(image_path) if image_path else None,
+        audio_prompt=request.audio_prompt,
     )
 
     position = get_queue_position(job["id"])

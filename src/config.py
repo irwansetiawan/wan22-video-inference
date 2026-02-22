@@ -39,6 +39,11 @@ VIDEO_SHIFT = 8.0
 VIDEO_FPS = 24
 PRESIGNED_URL_EXPIRY = 3600  # 1 hour
 
+# MMAudio settings
+MMAUDIO_MODEL = "mmaudio_large_44k_v2.pth"
+MMAUDIO_STEPS = 25
+MMAUDIO_CFG = 4.5
+
 # WAN 2.2 5B FP16 model filenames (Comfy-Org repackaged, unified TI2V)
 TI2V_MODEL = "wan2.2_ti2v_5B_fp16.safetensors"
 TEXT_ENCODER_MODEL = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
