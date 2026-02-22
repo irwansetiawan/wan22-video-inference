@@ -103,21 +103,29 @@ if [ -f "$MMAUDIO_DIR/requirements.txt" ]; then
 fi
 
 # =============================================
-# Download MMAudio Models (~4.8GB total)
+# Download MMAudio Models (FP16 safetensors, ~5GB total)
 # =============================================
 echo "Downloading MMAudio models..."
 
-# MMAudio large 44k v2 flow model (~3.9GB)
+# MMAudio large 44k v2 flow model (~1.9GB fp16)
 echo "Downloading MMAudio flow model..."
 download_model "Kijai/MMAudio_safetensors" \
-    "mmaudio_large_44k_v2.pth" "mmaudio"
+    "mmaudio_large_44k_v2_fp16.safetensors" "mmaudio"
 
-# Synchformer visual encoder (~907MB)
+# MMAudio VAE 44k (~600MB fp16)
+echo "Downloading MMAudio VAE..."
+download_model "Kijai/MMAudio_safetensors" \
+    "mmaudio_vae_44k_fp16.safetensors" "mmaudio"
+
+# Synchformer visual encoder (~454MB fp16)
 echo "Downloading Synchformer model..."
 download_model "Kijai/MMAudio_safetensors" \
-    "synchformer_state_dict.pth" "mmaudio"
+    "mmaudio_synchformer_fp16.safetensors" "mmaudio"
 
-# Note: BigVGAN vocoder and CLIP models are auto-downloaded on first run
+# CLIP model (~1.9GB fp16)
+echo "Downloading CLIP model..."
+download_model "Kijai/MMAudio_safetensors" \
+    "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors" "mmaudio"
 
 # =============================================
 # API Server Dependencies

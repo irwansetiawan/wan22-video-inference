@@ -40,7 +40,10 @@ VIDEO_FPS = 24
 PRESIGNED_URL_EXPIRY = 3600  # 1 hour
 
 # MMAudio settings
-MMAUDIO_MODEL = "mmaudio_large_44k_v2.pth"
+MMAUDIO_MODEL = "mmaudio_large_44k_v2_fp16.safetensors"
+MMAUDIO_VAE = "mmaudio_vae_44k_fp16.safetensors"
+MMAUDIO_SYNCHFORMER = "mmaudio_synchformer_fp16.safetensors"
+MMAUDIO_CLIP = "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors"
 MMAUDIO_STEPS = 25
 MMAUDIO_CFG = 4.5
 

@@ -23,6 +23,9 @@ from src.config import (
     TEXT_ENCODER_MODEL,
     VAE_MODEL,
     MMAUDIO_MODEL,
+    MMAUDIO_VAE,
+    MMAUDIO_SYNCHFORMER,
+    MMAUDIO_CLIP,
     MMAUDIO_STEPS,
     MMAUDIO_CFG,
 )
@@ -243,11 +246,18 @@ def _build_audio_nodes(audio_prompt: str, seed: int) -> dict:
             "class_type": "MMAudioModelLoader",
             "inputs": {
                 "mmaudio_model": MMAUDIO_MODEL,
+                "base_precision": "fp16",
             },
         },
         "71": {
             "class_type": "MMAudioFeatureUtilsLoader",
-            "inputs": {},
+            "inputs": {
+                "vae_model": MMAUDIO_VAE,
+                "synchformer_model": MMAUDIO_SYNCHFORMER,
+                "clip_model": MMAUDIO_CLIP,
+                "mode": "44k",
+                "precision": "fp16",
+            },
         },
         "72": {
             "class_type": "MMAudioSampler",
