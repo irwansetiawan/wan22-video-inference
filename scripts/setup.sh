@@ -42,78 +42,67 @@ pip install -r requirements.txt
 # =============================================
 # Download WAN 2.2 14B FP8 Models
 # =============================================
-echo "Downloading WAN 2.2 14B FP8 models (~34GB total)..."
+echo "Downloading WAN 2.2 14B FP8 models (~60GB total)..."
 pip install "huggingface_hub[cli]"
 
 MODELS_DIR="$COMFYUI_DIR/models"
+HF_DOWNLOAD="$COMFYUI_DIR/venv/bin/python -c"
+
+# Download helper: downloads from HuggingFace and symlinks into ComfyUI model dirs
+download_model() {
+    local repo="$1"
+    local remote_path="$2"
+    local target_dir="$3"
+    local filename=$(basename "$remote_path")
+    local target="$MODELS_DIR/$target_dir/$filename"
+
+    if [ -f "$target" ] || [ -L "$target" ]; then
+        echo "  SKIP $filename (already exists)"
+        return
+    fi
+
+    echo "  Downloading $filename..."
+    local local_path=$($HF_DOWNLOAD "
+from huggingface_hub import hf_hub_download
+print(hf_hub_download(repo_id='$repo', filename='$remote_path'))
+")
+    mkdir -p "$MODELS_DIR/$target_dir"
+    ln -sf "$local_path" "$target"
+    echo "  -> $target"
+}
 
 # Text encoder (FP8, ~5GB)
 echo "Downloading text encoder..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" \
-    "$MODELS_DIR/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" \
-    "$MODELS_DIR/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "text_encoders"
 
 # VAE (~254MB)
 echo "Downloading VAE..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/vae/wan_2.1_vae.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/vae/wan_2.1_vae.safetensors" \
-    "$MODELS_DIR/vae/wan_2.1_vae.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/vae/wan_2.1_vae.safetensors" \
-    "$MODELS_DIR/vae/wan_2.1_vae.safetensors"
+download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/vae/wan_2.1_vae.safetensors" "vae"
 
 # T2V diffusion models (FP8, ~14GB each)
 echo "Downloading T2V high-noise model..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
+download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors" "diffusion_models"
 
 echo "Downloading T2V low-noise model..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "diffusion_models"
 
 # I2V diffusion models (FP8, ~14GB each)
 echo "Downloading I2V high-noise model..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
+download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" "diffusion_models"
 
 echo "Downloading I2V low-noise model..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" \
-    "$MODELS_DIR/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" "diffusion_models"
 
-# CLIP Vision for I2V (~3.9GB)
+# CLIP Vision for I2V (~1.3GB, from WAN 2.1 repo — shared across versions)
 echo "Downloading CLIP Vision encoder..."
-huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
-    split_files/clip_vision/clip_vision_h.safetensors \
-    --local-dir "$MODELS_DIR"
-ln -sf "$MODELS_DIR/split_files/clip_vision/clip_vision_h.safetensors" \
-    "$MODELS_DIR/clip_vision/clip_vision_h.safetensors" 2>/dev/null || \
-    cp "$MODELS_DIR/split_files/clip_vision/clip_vision_h.safetensors" \
-    "$MODELS_DIR/clip_vision/clip_vision_h.safetensors"
+download_model "Comfy-Org/Wan_2.1_ComfyUI_repackaged" \
+    "split_files/clip_vision/clip_vision_h.safetensors" "clip_vision"
 
 # =============================================
 # API Server Dependencies
