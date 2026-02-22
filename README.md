@@ -96,7 +96,7 @@ curl http://<ec2-ip>:8000/status/<job_id> \
 
 - **Resolution**: 832x480 (480p)
 - **Frames**: 81 (~5 seconds at 16fps)
-- **Format**: WEBP (animated)
+- **Format**: MP4 (H.264)
 - **Estimated generation time**: ~6-10 minutes per video
 
 ## Cost Management

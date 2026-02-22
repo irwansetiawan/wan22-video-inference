@@ -145,15 +145,20 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
                 "vae": ["39", 0],
             },
         },
+        "61": {
+            "class_type": "CreateVideo",
+            "inputs": {
+                "images": ["8", 0],
+                "fps": 16.0,
+            },
+        },
         "60": {
-            "class_type": "SaveAnimatedWEBP",
+            "class_type": "SaveVideo",
             "inputs": {
                 "filename_prefix": "wan22_video",
-                "fps": 16,
-                "lossless": False,
-                "quality": 90,
-                "method": "default",
-                "images": ["8", 0],
+                "format": "mp4",
+                "codec": "h264",
+                "video": ["61", 0],
             },
         },
     }
@@ -291,15 +296,20 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
                 "vae": ["39", 0],
             },
         },
+        "61": {
+            "class_type": "CreateVideo",
+            "inputs": {
+                "images": ["8", 0],
+                "fps": 16.0,
+            },
+        },
         "60": {
-            "class_type": "SaveAnimatedWEBP",
+            "class_type": "SaveVideo",
             "inputs": {
                 "filename_prefix": "wan22_video",
-                "fps": 16,
-                "lossless": False,
-                "quality": 90,
-                "method": "default",
-                "images": ["8", 0],
+                "format": "mp4",
+                "codec": "h264",
+                "video": ["61", 0],
             },
         },
     }

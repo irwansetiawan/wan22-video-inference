@@ -247,7 +247,7 @@ Jobs are processed sequentially, one at a time.
 ## Video Output
 
 - **Model:** WAN 2.2 14B (FP8 quantized, dual expert architecture)
-- **Format:** WEBP (animated)
+- **Format:** MP4 (H.264)
 - **Resolution:** 832x480 (480p)
 - **Frame rate:** 16 fps
 - **Duration:** ~5 seconds (81 frames)
