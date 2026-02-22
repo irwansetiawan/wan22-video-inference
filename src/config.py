@@ -30,17 +30,16 @@ OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 COMFYUI_URL = os.getenv("COMFYUI_URL", "http://127.0.0.1:8188")
 
 # Video settings
-VIDEO_WIDTH = 832
-VIDEO_HEIGHT = 480
-VIDEO_FRAME_NUM = 81  # Must be 4n+1. 81 frames = ~5s at 16fps
-VIDEO_STEPS = 20
-VIDEO_CFG = 6.0
+VIDEO_WIDTH = 1280
+VIDEO_HEIGHT = 704
+VIDEO_FRAME_NUM = 121  # Must be 4n+1. 121 frames at 24fps → ~5.04s
+VIDEO_STEPS = 30
+VIDEO_CFG = 5.0
 VIDEO_SHIFT = 8.0
+VIDEO_FPS = 24
 PRESIGNED_URL_EXPIRY = 3600  # 1 hour
 
-# WAN 2.2 14B FP8 model filenames (Comfy-Org repackaged, single expert)
-T2V_MODEL = "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
-I2V_MODEL = "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
+# WAN 2.2 5B FP16 model filenames (Comfy-Org repackaged, unified TI2V)
+TI2V_MODEL = "wan2.2_ti2v_5B_fp16.safetensors"
 TEXT_ENCODER_MODEL = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-VAE_MODEL = "wan_2.1_vae.safetensors"
-CLIP_VISION_MODEL = "clip_vision_h.safetensors"
+VAE_MODEL = "wan2.2_vae.safetensors"

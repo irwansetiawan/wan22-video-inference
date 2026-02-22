@@ -17,11 +17,10 @@ from src.config import (
     VIDEO_STEPS,
     VIDEO_CFG,
     VIDEO_SHIFT,
-    T2V_MODEL,
-    I2V_MODEL,
+    VIDEO_FPS,
+    TI2V_MODEL,
     TEXT_ENCODER_MODEL,
     VAE_MODEL,
-    CLIP_VISION_MODEL,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,12 +32,12 @@ class InferenceError(Exception):
 
 
 def _build_t2v_workflow(prompt: str, seed: int) -> dict:
-    """Build a WAN 2.2 14B FP8 text-to-video workflow for ComfyUI (single expert)."""
+    """Build a WAN 2.2 5B text-to-video workflow for ComfyUI."""
     return {
         "10": {
             "class_type": "UNETLoader",
             "inputs": {
-                "unet_name": T2V_MODEL,
+                "unet_name": TI2V_MODEL,
                 "weight_dtype": "default",
             },
         },
@@ -70,12 +69,13 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
             },
         },
         "40": {
-            "class_type": "EmptyHunyuanLatentVideo",
+            "class_type": "Wan22ImageToVideoLatent",
             "inputs": {
                 "width": VIDEO_WIDTH,
                 "height": VIDEO_HEIGHT,
                 "length": VIDEO_FRAME_NUM,
                 "batch_size": 1,
+                "vae": ["39", 0],
             },
         },
         "48": {
@@ -91,8 +91,8 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
                 "seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
-                "sampler_name": "euler",
-                "scheduler": "normal",
+                "sampler_name": "uni_pc",
+                "scheduler": "simple",
                 "denoise": 1.0,
                 "model": ["48", 0],
                 "positive": ["6", 0],
@@ -111,7 +111,7 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
             "class_type": "CreateVideo",
             "inputs": {
                 "images": ["8", 0],
-                "fps": 16.0,
+                "fps": float(VIDEO_FPS),
             },
         },
         "60": {
@@ -127,12 +127,12 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
 
 
 def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
-    """Build a WAN 2.2 14B FP8 image-to-video workflow for ComfyUI (single expert)."""
+    """Build a WAN 2.2 5B image-to-video workflow for ComfyUI."""
     return {
         "10": {
             "class_type": "UNETLoader",
             "inputs": {
-                "unet_name": I2V_MODEL,
+                "unet_name": TI2V_MODEL,
                 "weight_dtype": "default",
             },
         },
@@ -149,23 +149,10 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
                 "vae_name": VAE_MODEL,
             },
         },
-        "42": {
-            "class_type": "CLIPVisionLoader",
-            "inputs": {
-                "clip_name": CLIP_VISION_MODEL,
-            },
-        },
         "20": {
             "class_type": "LoadImage",
             "inputs": {
                 "image": image_path.name,
-            },
-        },
-        "43": {
-            "class_type": "CLIPVisionEncode",
-            "inputs": {
-                "clip_vision": ["42", 0],
-                "image": ["20", 0],
             },
         },
         "6": {
@@ -183,13 +170,12 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
             },
         },
         "44": {
-            "class_type": "WanImageToVideo",
+            "class_type": "Wan22ImageToVideoLatent",
             "inputs": {
                 "width": VIDEO_WIDTH,
                 "height": VIDEO_HEIGHT,
                 "length": VIDEO_FRAME_NUM,
                 "batch_size": 1,
-                "clip_vision_output": ["43", 0],
                 "start_image": ["20", 0],
                 "vae": ["39", 0],
             },
@@ -207,8 +193,8 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
                 "seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
-                "sampler_name": "euler",
-                "scheduler": "normal",
+                "sampler_name": "uni_pc",
+                "scheduler": "simple",
                 "denoise": 1.0,
                 "model": ["48", 0],
                 "positive": ["6", 0],
@@ -227,7 +213,7 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
             "class_type": "CreateVideo",
             "inputs": {
                 "images": ["8", 0],
-                "fps": 16.0,
+                "fps": float(VIDEO_FPS),
             },
         },
         "60": {
@@ -331,7 +317,7 @@ def generate_video(
     image_path: Optional[Path] = None,
 ) -> Path:
     """
-    Generate a video using ComfyUI with WAN 2.2 14B FP8 models.
+    Generate a video using ComfyUI with WAN 2.2 5B model.
 
     Returns the path to the generated video file.
     Raises InferenceError if generation fails.
@@ -367,7 +353,6 @@ def cleanup_job_files(job_id: str, input_path: Optional[Path] = None):
         shutil.rmtree(output_dir)
 
     if input_path and input_path.exists():
-        # Also remove the copy in ComfyUI's input directory
         comfyui_copy = COMFYUI_DIR / "input" / input_path.name
         if comfyui_copy.exists():
             comfyui_copy.unlink()

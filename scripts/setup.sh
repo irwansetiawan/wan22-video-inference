@@ -40,9 +40,9 @@ echo "Installing ComfyUI dependencies..."
 pip install -r requirements.txt
 
 # =============================================
-# Download WAN 2.2 14B FP8 Models
+# Download WAN 2.2 5B FP16 Models
 # =============================================
-echo "Downloading WAN 2.2 14B FP8 models (~60GB total)..."
+echo "Downloading WAN 2.2 5B FP16 models (~16GB total)..."
 pip install "huggingface_hub[cli]"
 
 MODELS_DIR="$COMFYUI_DIR/models"
@@ -76,33 +76,15 @@ echo "Downloading text encoder..."
 download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
     "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "text_encoders"
 
-# VAE (~254MB)
+# VAE (~1.4GB, WAN 2.2 version)
 echo "Downloading VAE..."
 download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-    "split_files/vae/wan_2.1_vae.safetensors" "vae"
+    "split_files/vae/wan2.2_vae.safetensors" "vae"
 
-# T2V diffusion models (FP8, ~14GB each)
-echo "Downloading T2V high-noise model..."
+# Unified TI2V 5B diffusion model (FP16, ~10GB)
+echo "Downloading TI2V 5B model..."
 download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-    "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors" "diffusion_models"
-
-echo "Downloading T2V low-noise model..."
-download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-    "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "diffusion_models"
-
-# I2V diffusion models (FP8, ~14GB each)
-echo "Downloading I2V high-noise model..."
-download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-    "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" "diffusion_models"
-
-echo "Downloading I2V low-noise model..."
-download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-    "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" "diffusion_models"
-
-# CLIP Vision for I2V (~1.3GB, from WAN 2.1 repo — shared across versions)
-echo "Downloading CLIP Vision encoder..."
-download_model "Comfy-Org/Wan_2.1_ComfyUI_repackaged" \
-    "split_files/clip_vision/clip_vision_h.safetensors" "clip_vision"
+    "split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors" "diffusion_models"
 
 # =============================================
 # API Server Dependencies

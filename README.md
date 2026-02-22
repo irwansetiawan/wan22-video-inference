@@ -1,10 +1,10 @@
 # WAN 2.2 Video Generation API
 
-Self-hosted WAN 2.2 14B FP8 video generation API powered by ComfyUI on AWS EC2.
+Self-hosted WAN 2.2 5B video generation API powered by ComfyUI on AWS EC2.
 
 ## Architecture
 
-- **Model**: WAN 2.2 14B FP8 (dual expert: high-noise + low-noise)
+- **Model**: WAN 2.2 5B FP16 (unified TI2V, single dense model ~10GB)
 - **Backend**: ComfyUI (localhost:8188) — handles model loading, inference, and GPU management
 - **API**: FastAPI (port 8000) — public REST API that submits workflows to ComfyUI
 - **EC2 (Compute)**: g5.xlarge in **Tokyo (ap-northeast-1)** — NVIDIA A10G 24GB VRAM, ~$1.46/hr
@@ -14,7 +14,7 @@ Self-hosted WAN 2.2 14B FP8 video generation API powered by ComfyUI on AWS EC2.
 
 - AWS EC2 g5.xlarge instance (24GB VRAM A10G GPU)
 - Ubuntu 22.04 Deep Learning AMI
-- Storage: 150GB EBS (models are ~60GB total)
+- Storage: 100GB EBS (models are ~16GB total)
 - S3 bucket in ap-southeast-1 for video storage
 
 ## Quick Start
@@ -23,7 +23,7 @@ Self-hosted WAN 2.2 14B FP8 video generation API powered by ComfyUI on AWS EC2.
 
 Launch a g5.xlarge instance in **ap-northeast-1 (Tokyo)** with:
 - AMI: Deep Learning AMI GPU PyTorch 2.0+ (Ubuntu 22.04)
-- Storage: 150GB EBS
+- Storage: 100GB EBS
 - Security Group: Allow ports 22 (SSH) and 8000 (API)
 
 ### 2. Clone and Setup
@@ -36,7 +36,7 @@ ssh -i your-key.pem ubuntu@<ec2-ip>
 git clone <your-repo-url> ~/wan22
 cd ~/wan22
 
-# Run setup (downloads ~60GB of models, takes ~20-30 min)
+# Run setup (downloads ~16GB of models, takes ~5-10 min)
 ./scripts/setup.sh
 ```
 
@@ -94,10 +94,11 @@ curl http://<ec2-ip>:8000/status/<job_id> \
 
 ## Video Output
 
-- **Resolution**: 832x480 (480p)
-- **Frames**: 81 (~5 seconds at 16fps)
+- **Resolution**: 1280x704 (720p)
+- **Frame rate**: 24fps (native)
+- **Duration**: ~5 seconds (121 frames)
 - **Format**: MP4 (H.264)
-- **Estimated generation time**: ~6-10 minutes per video
+- **Estimated generation time**: ~9 minutes per video
 
 ## Cost Management
 
@@ -128,6 +129,7 @@ sudo systemctl restart wan-api
 ```
 
 ### Out of memory
-The A10G has 24GB VRAM. WAN 2.2 14B FP8 at 480p typically uses ~18-22GB VRAM. If OOM occurs:
-- Reduce `VIDEO_FRAME_NUM` in `src/config.py` (e.g., 41 frames instead of 81)
+The A10G has 24GB VRAM. WAN 2.2 5B FP16 at 720p typically uses ~18-22GB VRAM. If OOM occurs:
+- Reduce `VIDEO_FRAME_NUM` in `src/config.py` (e.g., 81 frames instead of 121)
+- Reduce resolution in `src/config.py` (e.g., 832x480)
 - Ensure no other GPU processes are running: `nvidia-smi`
