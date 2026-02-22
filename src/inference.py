@@ -17,6 +17,7 @@ from src.config import (
     VIDEO_STEPS,
     VIDEO_CFG,
     VIDEO_SHIFT,
+    VIDEO_STEP_SPLIT,
     T2V_HIGH_NOISE_MODEL,
     T2V_LOW_NOISE_MODEL,
     I2V_HIGH_NOISE_MODEL,
@@ -101,33 +102,46 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
                 "shift": VIDEO_SHIFT,
             },
         },
-        "50": {
-            "class_type": "WanDualModelMerge",
-            "inputs": {
-                "high_noise_model": ["48", 0],
-                "low_noise_model": ["49", 0],
-                "threshold": 0.5,
-            },
-        },
         "3": {
-            "class_type": "KSampler",
+            "class_type": "KSamplerAdvanced",
             "inputs": {
-                "seed": seed,
+                "add_noise": "enable",
+                "noise_seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
-                "sampler_name": "uni_pc",
+                "sampler_name": "euler",
                 "scheduler": "normal",
-                "denoise": 1.0,
-                "model": ["50", 0],
+                "start_at_step": 0,
+                "end_at_step": VIDEO_STEP_SPLIT,
+                "return_with_leftover_noise": "enable",
+                "model": ["48", 0],
                 "positive": ["6", 0],
                 "negative": ["7", 0],
                 "latent_image": ["40", 0],
             },
         },
+        "4": {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                "add_noise": "disable",
+                "noise_seed": seed,
+                "steps": VIDEO_STEPS,
+                "cfg": VIDEO_CFG,
+                "sampler_name": "euler",
+                "scheduler": "normal",
+                "start_at_step": VIDEO_STEP_SPLIT,
+                "end_at_step": VIDEO_STEPS,
+                "return_with_leftover_noise": "disable",
+                "model": ["49", 0],
+                "positive": ["6", 0],
+                "negative": ["7", 0],
+                "latent_image": ["3", 0],
+            },
+        },
         "8": {
             "class_type": "VAEDecode",
             "inputs": {
-                "samples": ["3", 0],
+                "samples": ["4", 0],
                 "vae": ["39", 0],
             },
         },
@@ -234,33 +248,46 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
                 "shift": VIDEO_SHIFT,
             },
         },
-        "50": {
-            "class_type": "WanDualModelMerge",
-            "inputs": {
-                "high_noise_model": ["48", 0],
-                "low_noise_model": ["49", 0],
-                "threshold": 0.5,
-            },
-        },
         "3": {
-            "class_type": "KSampler",
+            "class_type": "KSamplerAdvanced",
             "inputs": {
-                "seed": seed,
+                "add_noise": "enable",
+                "noise_seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
-                "sampler_name": "uni_pc",
+                "sampler_name": "euler",
                 "scheduler": "normal",
-                "denoise": 1.0,
-                "model": ["50", 0],
+                "start_at_step": 0,
+                "end_at_step": VIDEO_STEP_SPLIT,
+                "return_with_leftover_noise": "enable",
+                "model": ["48", 0],
                 "positive": ["6", 0],
                 "negative": ["7", 0],
                 "latent_image": ["44", 0],
             },
         },
+        "4": {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                "add_noise": "disable",
+                "noise_seed": seed,
+                "steps": VIDEO_STEPS,
+                "cfg": VIDEO_CFG,
+                "sampler_name": "euler",
+                "scheduler": "normal",
+                "start_at_step": VIDEO_STEP_SPLIT,
+                "end_at_step": VIDEO_STEPS,
+                "return_with_leftover_noise": "disable",
+                "model": ["49", 0],
+                "positive": ["6", 0],
+                "negative": ["7", 0],
+                "latent_image": ["3", 0],
+            },
+        },
         "8": {
             "class_type": "VAEDecode",
             "inputs": {
-                "samples": ["3", 0],
+                "samples": ["4", 0],
                 "vae": ["39", 0],
             },
         },
@@ -289,6 +316,9 @@ def _submit_prompt(workflow: dict) -> str:
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:2000]
+        raise InferenceError(f"ComfyUI rejected workflow ({e.code}): {body}")
     except Exception as e:
         raise InferenceError(f"Failed to submit to ComfyUI: {e}")
 
