@@ -17,11 +17,8 @@ from src.config import (
     VIDEO_STEPS,
     VIDEO_CFG,
     VIDEO_SHIFT,
-    VIDEO_STEP_SPLIT,
-    T2V_HIGH_NOISE_MODEL,
-    T2V_LOW_NOISE_MODEL,
-    I2V_HIGH_NOISE_MODEL,
-    I2V_LOW_NOISE_MODEL,
+    T2V_MODEL,
+    I2V_MODEL,
     TEXT_ENCODER_MODEL,
     VAE_MODEL,
     CLIP_VISION_MODEL,
@@ -36,19 +33,12 @@ class InferenceError(Exception):
 
 
 def _build_t2v_workflow(prompt: str, seed: int) -> dict:
-    """Build a WAN 2.2 14B FP8 text-to-video workflow for ComfyUI."""
+    """Build a WAN 2.2 14B FP8 text-to-video workflow for ComfyUI (single expert)."""
     return {
         "10": {
             "class_type": "UNETLoader",
             "inputs": {
-                "unet_name": T2V_HIGH_NOISE_MODEL,
-                "weight_dtype": "default",
-            },
-        },
-        "11": {
-            "class_type": "UNETLoader",
-            "inputs": {
-                "unet_name": T2V_LOW_NOISE_MODEL,
+                "unet_name": T2V_MODEL,
                 "weight_dtype": "default",
             },
         },
@@ -95,53 +85,25 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
                 "shift": VIDEO_SHIFT,
             },
         },
-        "49": {
-            "class_type": "ModelSamplingSD3",
-            "inputs": {
-                "model": ["11", 0],
-                "shift": VIDEO_SHIFT,
-            },
-        },
         "3": {
-            "class_type": "KSamplerAdvanced",
+            "class_type": "KSampler",
             "inputs": {
-                "add_noise": "enable",
-                "noise_seed": seed,
+                "seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
                 "sampler_name": "euler",
                 "scheduler": "normal",
-                "start_at_step": 0,
-                "end_at_step": VIDEO_STEP_SPLIT,
-                "return_with_leftover_noise": "enable",
+                "denoise": 1.0,
                 "model": ["48", 0],
                 "positive": ["6", 0],
                 "negative": ["7", 0],
                 "latent_image": ["40", 0],
             },
         },
-        "4": {
-            "class_type": "KSamplerAdvanced",
-            "inputs": {
-                "add_noise": "disable",
-                "noise_seed": seed,
-                "steps": VIDEO_STEPS,
-                "cfg": VIDEO_CFG,
-                "sampler_name": "euler",
-                "scheduler": "normal",
-                "start_at_step": VIDEO_STEP_SPLIT,
-                "end_at_step": VIDEO_STEPS,
-                "return_with_leftover_noise": "disable",
-                "model": ["49", 0],
-                "positive": ["6", 0],
-                "negative": ["7", 0],
-                "latent_image": ["3", 0],
-            },
-        },
         "8": {
             "class_type": "VAEDecode",
             "inputs": {
-                "samples": ["4", 0],
+                "samples": ["3", 0],
                 "vae": ["39", 0],
             },
         },
@@ -165,19 +127,12 @@ def _build_t2v_workflow(prompt: str, seed: int) -> dict:
 
 
 def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
-    """Build a WAN 2.2 14B FP8 image-to-video workflow for ComfyUI."""
+    """Build a WAN 2.2 14B FP8 image-to-video workflow for ComfyUI (single expert)."""
     return {
         "10": {
             "class_type": "UNETLoader",
             "inputs": {
-                "unet_name": I2V_HIGH_NOISE_MODEL,
-                "weight_dtype": "default",
-            },
-        },
-        "11": {
-            "class_type": "UNETLoader",
-            "inputs": {
-                "unet_name": I2V_LOW_NOISE_MODEL,
+                "unet_name": I2V_MODEL,
                 "weight_dtype": "default",
             },
         },
@@ -246,53 +201,25 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
                 "shift": VIDEO_SHIFT,
             },
         },
-        "49": {
-            "class_type": "ModelSamplingSD3",
-            "inputs": {
-                "model": ["11", 0],
-                "shift": VIDEO_SHIFT,
-            },
-        },
         "3": {
-            "class_type": "KSamplerAdvanced",
+            "class_type": "KSampler",
             "inputs": {
-                "add_noise": "enable",
-                "noise_seed": seed,
+                "seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
                 "sampler_name": "euler",
                 "scheduler": "normal",
-                "start_at_step": 0,
-                "end_at_step": VIDEO_STEP_SPLIT,
-                "return_with_leftover_noise": "enable",
+                "denoise": 1.0,
                 "model": ["48", 0],
                 "positive": ["6", 0],
                 "negative": ["7", 0],
                 "latent_image": ["44", 0],
             },
         },
-        "4": {
-            "class_type": "KSamplerAdvanced",
-            "inputs": {
-                "add_noise": "disable",
-                "noise_seed": seed,
-                "steps": VIDEO_STEPS,
-                "cfg": VIDEO_CFG,
-                "sampler_name": "euler",
-                "scheduler": "normal",
-                "start_at_step": VIDEO_STEP_SPLIT,
-                "end_at_step": VIDEO_STEPS,
-                "return_with_leftover_noise": "disable",
-                "model": ["49", 0],
-                "positive": ["6", 0],
-                "negative": ["7", 0],
-                "latent_image": ["3", 0],
-            },
-        },
         "8": {
             "class_type": "VAEDecode",
             "inputs": {
-                "samples": ["4", 0],
+                "samples": ["3", 0],
                 "vae": ["39", 0],
             },
         },

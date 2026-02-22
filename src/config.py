@@ -36,14 +36,11 @@ VIDEO_FRAME_NUM = 81  # Must be 4n+1. 81 frames = ~5s at 16fps
 VIDEO_STEPS = 20
 VIDEO_CFG = 6.0
 VIDEO_SHIFT = 8.0
-VIDEO_STEP_SPLIT = 10  # High-noise model handles steps 0→10, low-noise handles 10→20
 PRESIGNED_URL_EXPIRY = 3600  # 1 hour
 
-# WAN 2.2 14B FP8 model filenames (Comfy-Org repackaged)
-T2V_HIGH_NOISE_MODEL = "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
-T2V_LOW_NOISE_MODEL = "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
-I2V_HIGH_NOISE_MODEL = "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
-I2V_LOW_NOISE_MODEL = "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+# WAN 2.2 14B FP8 model filenames (Comfy-Org repackaged, single expert)
+T2V_MODEL = "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
+I2V_MODEL = "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
 TEXT_ENCODER_MODEL = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 VAE_MODEL = "wan_2.1_vae.safetensors"
 CLIP_VISION_MODEL = "clip_vision_h.safetensors"
