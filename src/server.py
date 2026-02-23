@@ -102,6 +102,12 @@ async def generate(request: GenerateRequest):
     if not request.prompt:
         raise HTTPException(status_code=400, detail="Prompt is required")
 
+    if not request.image_base64 and not request.image_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Image is required (image_base64 or image_url)",
+        )
+
     image_path = None
 
     # Handle image input

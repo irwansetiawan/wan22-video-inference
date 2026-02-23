@@ -17,9 +17,11 @@ from src.config import (
     VIDEO_FRAME_NUM,
     VIDEO_STEPS,
     VIDEO_CFG,
-    VIDEO_SHIFT,
+    VIDEO_SPLIT_STEP,
     VIDEO_FPS,
-    TI2V_MODEL,
+    VIDEO_SIGMAS,
+    I2V_HIGH_NOISE_MODEL,
+    I2V_LOW_NOISE_MODEL,
     TEXT_ENCODER_MODEL,
     VAE_MODEL,
     MMAUDIO_MODEL,
@@ -38,198 +40,170 @@ class InferenceError(Exception):
     pass
 
 
-def _build_t2v_workflow(prompt: str, seed: int) -> dict:
-    """Build a WAN 2.2 5B text-to-video workflow for ComfyUI."""
-    return {
-        "10": {
-            "class_type": "UNETLoader",
-            "inputs": {
-                "unet_name": TI2V_MODEL,
-                "weight_dtype": "default",
-            },
-        },
-        "38": {
-            "class_type": "CLIPLoader",
-            "inputs": {
-                "clip_name": TEXT_ENCODER_MODEL,
-                "type": "wan",
-            },
-        },
-        "39": {
-            "class_type": "VAELoader",
-            "inputs": {
-                "vae_name": VAE_MODEL,
-            },
-        },
-        "6": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "text": prompt,
-                "clip": ["38", 0],
-            },
-        },
-        "7": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "text": "worst quality, blurry, distorted, low quality, static, watermark",
-                "clip": ["38", 0],
-            },
-        },
-        "40": {
-            "class_type": "Wan22ImageToVideoLatent",
-            "inputs": {
-                "width": VIDEO_WIDTH,
-                "height": VIDEO_HEIGHT,
-                "length": VIDEO_FRAME_NUM,
-                "batch_size": 1,
-                "vae": ["39", 0],
-            },
-        },
-        "48": {
-            "class_type": "ModelSamplingSD3",
-            "inputs": {
-                "model": ["10", 0],
-                "shift": VIDEO_SHIFT,
-            },
-        },
-        "3": {
-            "class_type": "KSampler",
-            "inputs": {
-                "seed": seed,
-                "steps": VIDEO_STEPS,
-                "cfg": VIDEO_CFG,
-                "sampler_name": "uni_pc",
-                "scheduler": "simple",
-                "denoise": 1.0,
-                "model": ["48", 0],
-                "positive": ["6", 0],
-                "negative": ["7", 0],
-                "latent_image": ["40", 0],
-            },
-        },
-        "8": {
-            "class_type": "VAEDecode",
-            "inputs": {
-                "samples": ["3", 0],
-                "vae": ["39", 0],
-            },
-        },
-        "61": {
-            "class_type": "CreateVideo",
-            "inputs": {
-                "images": ["8", 0],
-                "fps": float(VIDEO_FPS),
-            },
-        },
-        "60": {
-            "class_type": "SaveVideo",
-            "inputs": {
-                "filename_prefix": "wan22_video",
-                "format": "mp4",
-                "codec": "h264",
-                "video": ["61", 0],
-            },
-        },
-    }
-
-
 def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
-    """Build a WAN 2.2 5B image-to-video workflow for ComfyUI."""
+    """Build a WAN 2.2 14B FP8 distilled image-to-video workflow for ComfyUI.
+
+    Uses dual high-noise / low-noise models with 4-step denoising via
+    WanVideoWrapper (Kijai) custom nodes.
+    """
     return {
-        "10": {
-            "class_type": "UNETLoader",
+        # --- Text encoding ---
+        "11": {
+            "class_type": "LoadWanVideoT5TextEncoder",
             "inputs": {
-                "unet_name": TI2V_MODEL,
-                "weight_dtype": "default",
+                "t5_model": TEXT_ENCODER_MODEL,
+                "precision": "fp8_e4m3fn",
             },
         },
-        "38": {
-            "class_type": "CLIPLoader",
+        "16": {
+            "class_type": "WanVideoTextEncode",
             "inputs": {
-                "clip_name": TEXT_ENCODER_MODEL,
-                "type": "wan",
+                "prompt": prompt,
+                "t5_encoder": ["11", 0],
+                "force_offload": True,
             },
         },
-        "39": {
-            "class_type": "VAELoader",
+        # --- Model loading (dual high/low noise) ---
+        "22": {
+            "class_type": "WanVideoModelLoader",
+            "inputs": {
+                "model": I2V_HIGH_NOISE_MODEL,
+                "base_precision": "fp8_e4m3fn",
+            },
+        },
+        "71": {
+            "class_type": "WanVideoModelLoader",
+            "inputs": {
+                "model": I2V_LOW_NOISE_MODEL,
+                "base_precision": "fp8_e4m3fn",
+            },
+        },
+        # --- VAE ---
+        "109": {
+            "class_type": "WanVideoVAELoader",
             "inputs": {
                 "vae_name": VAE_MODEL,
             },
         },
-        "20": {
+        # --- Block swap (memory management) ---
+        "39": {
+            "class_type": "WanVideoBlockSwap",
+            "inputs": {
+                "double_blocks_to_swap": 0,
+                "single_blocks_to_swap": 0,
+            },
+        },
+        "92": {
+            "class_type": "WanVideoSetBlockSwap",
+            "inputs": {
+                "wan_model": ["22", 0],
+                "block_swap": ["39", 0],
+            },
+        },
+        "93": {
+            "class_type": "WanVideoSetBlockSwap",
+            "inputs": {
+                "wan_model": ["71", 0],
+                "block_swap": ["39", 0],
+            },
+        },
+        # --- Image input ---
+        "106": {
             "class_type": "LoadImage",
             "inputs": {
                 "image": image_path.name,
             },
         },
-        "6": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "text": prompt,
-                "clip": ["38", 0],
-            },
-        },
-        "7": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "text": "worst quality, blurry, distorted, low quality, static, watermark",
-                "clip": ["38", 0],
-            },
-        },
-        "44": {
-            "class_type": "Wan22ImageToVideoLatent",
+        "108": {
+            "class_type": "ImageResizeKJv2",
             "inputs": {
                 "width": VIDEO_WIDTH,
                 "height": VIDEO_HEIGHT,
-                "length": VIDEO_FRAME_NUM,
-                "batch_size": 1,
-                "start_image": ["20", 0],
-                "vae": ["39", 0],
+                "interpolation": "lanczos",
+                "condition": "always",
+                "multiple_of": 16,
+                "round_method": "round",
+                "image": ["106", 0],
             },
         },
-        "48": {
-            "class_type": "ModelSamplingSD3",
+        # --- Image-to-video encode ---
+        "110": {
+            "class_type": "WanVideoImageToVideoEncode",
             "inputs": {
-                "model": ["10", 0],
-                "shift": VIDEO_SHIFT,
+                "vae": ["109", 0],
+                "image": ["108", 0],
+                "width": VIDEO_WIDTH,
+                "height": VIDEO_HEIGHT,
+                "length": VIDEO_FRAME_NUM,
             },
         },
-        "3": {
-            "class_type": "KSampler",
+        # --- Sigma schedule ---
+        "100": {
+            "class_type": "StringToFloatList",
+            "inputs": {
+                "float_string": VIDEO_SIGMAS,
+            },
+        },
+        "99": {
+            "class_type": "FloatToSigmas",
+            "inputs": {
+                "float_list": ["100", 0],
+            },
+        },
+        # --- Sampling (high-noise, steps 0→split) ---
+        "27": {
+            "class_type": "WanVideoSampler",
             "inputs": {
                 "seed": seed,
                 "steps": VIDEO_STEPS,
                 "cfg": VIDEO_CFG,
-                "sampler_name": "uni_pc",
-                "scheduler": "simple",
-                "denoise": 1.0,
-                "model": ["48", 0],
-                "positive": ["6", 0],
-                "negative": ["7", 0],
-                "latent_image": ["44", 0],
+                "start_step": 0,
+                "end_step": VIDEO_SPLIT_STEP,
+                "model": ["92", 0],
+                "positive": ["16", 0],
+                "negative": ["16", 0],
+                "latent_image": ["110", 0],
+                "image_embeds": ["110", 1],
+                "sigmas": ["99", 0],
+                "force_offload": True,
             },
         },
-        "8": {
-            "class_type": "VAEDecode",
+        # --- Sampling (low-noise, steps split→end) ---
+        "90": {
+            "class_type": "WanVideoSampler",
             "inputs": {
-                "samples": ["3", 0],
-                "vae": ["39", 0],
+                "seed": seed,
+                "steps": VIDEO_STEPS,
+                "cfg": VIDEO_CFG,
+                "start_step": VIDEO_SPLIT_STEP,
+                "end_step": VIDEO_STEPS,
+                "model": ["93", 0],
+                "positive": ["16", 0],
+                "negative": ["16", 0],
+                "latent_image": ["27", 0],
+                "image_embeds": ["110", 1],
+                "sigmas": ["99", 0],
+                "force_offload": True,
             },
         },
-        "61": {
-            "class_type": "CreateVideo",
+        # --- Decode ---
+        "28": {
+            "class_type": "WanVideoDecode",
             "inputs": {
-                "images": ["8", 0],
-                "fps": float(VIDEO_FPS),
+                "samples": ["90", 0],
+                "vae": ["109", 0],
             },
         },
+        # --- Output ---
         "60": {
-            "class_type": "SaveVideo",
+            "class_type": "VHS_VideoCombine",
             "inputs": {
+                "images": ["28", 0],
+                "frame_rate": float(VIDEO_FPS),
+                "loop_count": 0,
                 "filename_prefix": "wan22_video",
-                "format": "mp4",
-                "codec": "h264",
-                "video": ["61", 0],
+                "format": "video/h264-mp4",
+                "save_output": True,
             },
         },
     }
@@ -238,18 +212,18 @@ def _build_i2v_workflow(prompt: str, image_path: Path, seed: int) -> dict:
 def _build_audio_nodes(audio_prompt: str, seed: int) -> dict:
     """Build MMAudio nodes to append to a video workflow.
 
-    Expects node "8" (VAEDecode) to exist in the parent workflow,
+    Expects node "28" (WanVideoDecode) to exist in the parent workflow,
     providing decoded video frames as input to MMAudioSampler.
     """
     return {
-        "70": {
+        "80": {
             "class_type": "MMAudioModelLoader",
             "inputs": {
                 "mmaudio_model": MMAUDIO_MODEL,
                 "base_precision": "fp16",
             },
         },
-        "71": {
+        "81": {
             "class_type": "MMAudioFeatureUtilsLoader",
             "inputs": {
                 "vae_model": MMAUDIO_VAE,
@@ -259,12 +233,12 @@ def _build_audio_nodes(audio_prompt: str, seed: int) -> dict:
                 "precision": "fp16",
             },
         },
-        "72": {
+        "82": {
             "class_type": "MMAudioSampler",
             "inputs": {
-                "mmaudio_model": ["70", 0],
-                "feature_utils": ["71", 0],
-                "images": ["8", 0],
+                "mmaudio_model": ["80", 0],
+                "feature_utils": ["81", 0],
+                "images": ["28", 0],
                 "prompt": audio_prompt,
                 "negative_prompt": "",
                 "seed": seed,
@@ -275,11 +249,11 @@ def _build_audio_nodes(audio_prompt: str, seed: int) -> dict:
                 "force_offload": True,
             },
         },
-        "73": {
+        "83": {
             "class_type": "SaveAudio",
             "inputs": {
                 "filename_prefix": "wan22_audio",
-                "audio": ["72", 0],
+                "audio": ["82", 0],
             },
         },
     }
@@ -422,11 +396,11 @@ def _copy_image_to_comfyui(image_path: Path) -> None:
 def generate_video(
     job_id: str,
     prompt: str,
-    image_path: Optional[Path] = None,
+    image_path: Path,
     audio_prompt: Optional[str] = None,
 ) -> Path:
     """
-    Generate a video using ComfyUI with WAN 2.2 5B model.
+    Generate a video using ComfyUI with WAN 2.2 14B FP8 distilled model (I2V).
     Optionally generates synchronized audio via MMAudio.
 
     Returns the path to the generated video file (with audio if requested).
@@ -437,11 +411,8 @@ def generate_video(
 
     seed = hash(job_id) % (2**32)
 
-    if image_path:
-        _copy_image_to_comfyui(image_path)
-        workflow = _build_i2v_workflow(prompt, image_path, seed)
-    else:
-        workflow = _build_t2v_workflow(prompt, seed)
+    _copy_image_to_comfyui(image_path)
+    workflow = _build_i2v_workflow(prompt, image_path, seed)
 
     has_audio = bool(audio_prompt)
     if has_audio:

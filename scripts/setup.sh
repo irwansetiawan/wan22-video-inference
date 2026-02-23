@@ -40,9 +40,9 @@ echo "Installing ComfyUI dependencies..."
 pip install -r requirements.txt
 
 # =============================================
-# Download WAN 2.2 5B FP16 Models
+# Download WAN 2.2 14B FP8 Distilled Models
 # =============================================
-echo "Downloading WAN 2.2 5B FP16 models (~16GB total)..."
+echo "Downloading WAN 2.2 14B FP8 distilled models (~37GB total)..."
 pip install "huggingface_hub[cli]"
 
 MODELS_DIR="$COMFYUI_DIR/models"
@@ -81,23 +81,60 @@ echo "Downloading VAE..."
 download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
     "split_files/vae/wan2.2_vae.safetensors" "vae"
 
-# Unified TI2V 5B diffusion model (FP16, ~10GB)
-echo "Downloading TI2V 5B model..."
-download_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-    "split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors" "diffusion_models"
+# I2V 14B FP8 Distilled - high-noise model (~15GB)
+echo "Downloading I2V 14B high-noise model..."
+download_model "lightx2v/Wan2.2-Distill-Models" \
+    "wan2.2_i2v_A14b_high_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors" "diffusion_models"
+
+# I2V 14B FP8 Distilled - low-noise model (~15GB)
+echo "Downloading I2V 14B low-noise model..."
+download_model "lightx2v/Wan2.2-Distill-Models" \
+    "wan2.2_i2v_A14b_low_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors" "diffusion_models"
 
 # =============================================
-# ComfyUI-MMAudio Extension (audio generation)
+# Custom Node Extensions
 # =============================================
-echo "Installing ComfyUI-MMAudio extension..."
+echo "Installing custom node extensions..."
 CUSTOM_NODES_DIR="$COMFYUI_DIR/custom_nodes"
-MMAUDIO_DIR="$CUSTOM_NODES_DIR/ComfyUI-MMAudio"
+source "$COMFYUI_DIR/venv/bin/activate"
 
+# ComfyUI-WanVideoWrapper (model loading, sampling, I2V encode)
+echo "Installing ComfyUI-WanVideoWrapper..."
+if [ ! -d "$CUSTOM_NODES_DIR/ComfyUI-WanVideoWrapper" ]; then
+    git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git "$CUSTOM_NODES_DIR/ComfyUI-WanVideoWrapper"
+fi
+if [ -f "$CUSTOM_NODES_DIR/ComfyUI-WanVideoWrapper/requirements.txt" ]; then
+    pip install -r "$CUSTOM_NODES_DIR/ComfyUI-WanVideoWrapper/requirements.txt"
+fi
+
+# ComfyUI-KJNodes (ImageResizeKJv2, StringToFloatList, FloatToSigmas)
+echo "Installing ComfyUI-KJNodes..."
+if [ ! -d "$CUSTOM_NODES_DIR/ComfyUI-KJNodes" ]; then
+    git clone https://github.com/kijai/ComfyUI-KJNodes.git "$CUSTOM_NODES_DIR/ComfyUI-KJNodes"
+fi
+if [ -f "$CUSTOM_NODES_DIR/ComfyUI-KJNodes/requirements.txt" ]; then
+    pip install -r "$CUSTOM_NODES_DIR/ComfyUI-KJNodes/requirements.txt"
+fi
+
+# ComfyUI-VideoHelperSuite (VHS_VideoCombine for video output)
+echo "Installing ComfyUI-VideoHelperSuite..."
+if [ ! -d "$CUSTOM_NODES_DIR/ComfyUI-VideoHelperSuite" ]; then
+    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git "$CUSTOM_NODES_DIR/ComfyUI-VideoHelperSuite"
+fi
+if [ -f "$CUSTOM_NODES_DIR/ComfyUI-VideoHelperSuite/requirements.txt" ]; then
+    pip install -r "$CUSTOM_NODES_DIR/ComfyUI-VideoHelperSuite/requirements.txt"
+fi
+
+# SageAttention (faster attention, used by WanVideoWrapper)
+echo "Installing SageAttention..."
+pip install sageattention
+
+# ComfyUI-MMAudio (audio generation)
+echo "Installing ComfyUI-MMAudio..."
+MMAUDIO_DIR="$CUSTOM_NODES_DIR/ComfyUI-MMAudio"
 if [ ! -d "$MMAUDIO_DIR" ]; then
     git clone https://github.com/kijai/ComfyUI-MMAudio.git "$MMAUDIO_DIR"
 fi
-
-source "$COMFYUI_DIR/venv/bin/activate"
 if [ -f "$MMAUDIO_DIR/requirements.txt" ]; then
     pip install -r "$MMAUDIO_DIR/requirements.txt"
 fi

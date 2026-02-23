@@ -29,14 +29,21 @@ OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 # ComfyUI backend
 COMFYUI_URL = os.getenv("COMFYUI_URL", "http://127.0.0.1:8188")
 
-# Video settings
-VIDEO_WIDTH = 1280
-VIDEO_HEIGHT = 704
-VIDEO_FRAME_NUM = 121  # Must be 4n+1. 121 frames at 24fps → ~5.04s
-VIDEO_STEPS = 30
-VIDEO_CFG = 5.0
-VIDEO_SHIFT = 8.0
-VIDEO_FPS = 24
+# I2V 14B FP8 Distilled model filenames
+I2V_HIGH_NOISE_MODEL = "wan2.2_i2v_A14b_high_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors"
+I2V_LOW_NOISE_MODEL = "wan2.2_i2v_A14b_low_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors"
+TEXT_ENCODER_MODEL = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+VAE_MODEL = "wan2.2_vae.safetensors"
+
+# Video settings (distilled defaults)
+VIDEO_WIDTH = 832
+VIDEO_HEIGHT = 480
+VIDEO_FRAME_NUM = 81  # Must be 4n+1. 81 frames at 16fps → ~5.06s
+VIDEO_STEPS = 4
+VIDEO_CFG = 1.0
+VIDEO_SPLIT_STEP = 2
+VIDEO_FPS = 16
+VIDEO_SIGMAS = "1.0, 0.9375001, 0.8333333, 0.625, 0.0000"
 PRESIGNED_URL_EXPIRY = 3600  # 1 hour
 
 # MMAudio settings
@@ -46,8 +53,3 @@ MMAUDIO_SYNCHFORMER = "mmaudio_synchformer_fp16.safetensors"
 MMAUDIO_CLIP = "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors"
 MMAUDIO_STEPS = 25
 MMAUDIO_CFG = 4.5
-
-# WAN 2.2 5B FP16 model filenames (Comfy-Org repackaged, unified TI2V)
-TI2V_MODEL = "wan2.2_ti2v_5B_fp16.safetensors"
-TEXT_ENCODER_MODEL = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-VAE_MODEL = "wan2.2_vae.safetensors"

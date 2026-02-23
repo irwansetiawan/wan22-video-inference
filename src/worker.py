@@ -62,6 +62,11 @@ class VideoWorker:
 
         input_path = Path(job["image_path"]) if job["image_path"] else None
 
+        if not input_path:
+            update_job_status(job_id, "failed", error="Image is required for I2V model")
+            self._current_job_id = None
+            return
+
         try:
             # Generate video
             video_path = generate_video(
@@ -72,7 +77,7 @@ class VideoWorker:
             )
 
             # Upload to S3
-            ext = video_path.suffix  # .webp from ComfyUI
+            ext = video_path.suffix  # .mp4 from VHS_VideoCombine
             s3_key = f"videos/{job_id}{ext}"
             upload_video(video_path, s3_key)
 

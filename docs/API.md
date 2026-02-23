@@ -1,6 +1,6 @@
 # WAN 2.2 Video Generation API
 
-REST API for generating videos using the WAN 2.2 5B model (FP16, powered by ComfyUI). Supports both text-to-video and image-to-video generation.
+REST API for generating videos using the WAN 2.2 14B FP8 distilled model (image-to-video only, powered by ComfyUI).
 
 ## Base URL
 
@@ -48,7 +48,7 @@ GET /health
 
 ### Generate Video
 
-Submit a video generation job. Jobs are queued and processed one at a time.
+Submit a video generation job. Jobs are queued and processed one at a time. An input image is required (image-to-video only).
 
 ```
 POST /generate
@@ -66,20 +66,11 @@ POST /generate
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | Text description of the video to generate |
+| `image_url` | string | Yes* | URL of a reference image for image-to-video generation |
+| `image_base64` | string | Yes* | Base64-encoded reference image for image-to-video generation |
 | `audio_prompt` | string | No | Text description of audio/sound effects to generate. When provided, the output video includes AI-generated audio. |
-| `image_url` | string | No | URL of a reference image for image-to-video generation |
-| `image_base64` | string | No | Base64-encoded reference image for image-to-video generation |
 
-> **Note:** If both `image_url` and `image_base64` are provided, `image_base64` takes precedence. If neither is provided, the API performs text-to-video generation.
-
-**Example — Text-to-Video**
-
-```bash
-curl -X POST http://<your-server-ip>:8000/generate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: <your-api-key>" \
-  -d '{"prompt": "A cat dancing on the moon"}'
-```
+> **Note:** Either `image_url` or `image_base64` must be provided. If both are provided, `image_base64` takes precedence.
 
 **Example — Image-to-Video (URL)**
 
@@ -105,7 +96,7 @@ curl -X POST http://<your-server-ip>:8000/generate \
   }'
 ```
 
-**Example — Text-to-Video with Audio**
+**Example — Image-to-Video with Audio**
 
 ```bash
 curl -X POST http://<your-server-ip>:8000/generate \
@@ -113,6 +104,7 @@ curl -X POST http://<your-server-ip>:8000/generate \
   -H "X-API-Key: <your-api-key>" \
   -d '{
     "prompt": "Ocean waves crashing on a rocky shoreline at sunset",
+    "image_url": "https://example.com/shoreline.jpg",
     "audio_prompt": "Sound of ocean waves crashing, seagulls calling"
   }'
 ```
@@ -137,7 +129,7 @@ curl -X POST http://<your-server-ip>:8000/generate \
 
 | Status | Description |
 |--------|-------------|
-| 400 | Missing prompt, invalid base64, or failed image download |
+| 400 | Missing prompt, missing image, invalid base64, or failed image download |
 | 401 | Invalid or missing API key |
 
 ---
@@ -222,7 +214,7 @@ curl "http://<your-server-ip>:8000/jobs?status=completed&limit=10" \
   {
     "job_id": "550e8400-e29b-41d4-a716-446655440000",
     "status": "completed",
-    "prompt": "A cat dancing on the moon",
+    "prompt": "Make this character wave hello",
     "video_url": "https://s3.amazonaws.com/...",
     "error": null,
     "created_at": "2026-02-21T15:01:21.000000"
@@ -251,7 +243,7 @@ queued → processing → completed
 ```
 
 1. **queued** — Job is waiting in the queue
-2. **processing** — Video is being generated (typically ~9 min, ~10 min with audio)
+2. **processing** — Video is being generated (typically ~2-3 min, ~3-4 min with audio)
 3. **completed** — Video is ready, `video_url` is available
 4. **failed** — Generation failed, see `error` for details
 
@@ -259,12 +251,12 @@ Jobs are processed sequentially, one at a time.
 
 ## Video Output
 
-- **Video Model:** WAN 2.2 5B (FP16, unified TI2V architecture)
+- **Video Model:** WAN 2.2 14B FP8 Distilled (I2V only, 4-step denoising)
 - **Audio Model:** MMAudio Large 44k v2 (optional, when `audio_prompt` is provided)
 - **Format:** MP4 (H.264 video, AAC audio when audio is generated)
-- **Resolution:** 1280x704 (720p)
-- **Frame rate:** 24fps (native)
-- **Duration:** ~5 seconds (121 frames)
+- **Resolution:** 832x480
+- **Frame rate:** 16fps
+- **Duration:** ~5 seconds (81 frames)
 - **Audio:** 44.1kHz AAC (only when `audio_prompt` is provided)
 - **Storage:** Videos are uploaded to S3 and served via presigned URLs
 - **URL Expiry:** Presigned URLs expire after 1 hour. Call `/status/{job_id}` again to get a fresh URL.
@@ -284,11 +276,14 @@ const headers = {
   "X-API-Key": API_KEY,
 };
 
-// Submit a job
+// Submit a job (image required)
 const res = await fetch(`${API_URL}/generate`, {
   method: "POST",
   headers,
-  body: JSON.stringify({ prompt: "A cat dancing on the moon" }),
+  body: JSON.stringify({
+    prompt: "Make this character wave hello",
+    image_url: "https://example.com/character.jpg",
+  }),
 });
 const { job_id } = await res.json();
 
@@ -315,11 +310,14 @@ import requests
 API_URL = "http://<your-server-ip>:8000"
 HEADERS = {"X-API-Key": "<your-api-key>"}
 
-# Submit a job
+# Submit a job (image required)
 res = requests.post(
     f"{API_URL}/generate",
     headers=HEADERS,
-    json={"prompt": "A cat dancing on the moon"},
+    json={
+        "prompt": "Make this character wave hello",
+        "image_url": "https://example.com/character.jpg",
+    },
 )
 job_id = res.json()["job_id"]
 
